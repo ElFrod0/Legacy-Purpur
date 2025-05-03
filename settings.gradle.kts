@@ -2,6 +2,13 @@ import java.util.Locale
 
 pluginManagement {
     repositories {
+        maven {
+            url = uri("https://maven.pkg.github.com/ElFrod0/legacy-paperweight")
+            credentials {
+                username = System.getenv("USERNAME_GITHUB") ?: System.getenv("GITHUB_ACTOR") ?: "ElFrod0"
+                password = System.getenv("TOKEN_GITHUB") ?: System.getenv("GITHUB_TOKEN") ?: ""
+            }
+        }
         gradlePluginPortal()
         maven("https://repo.papermc.io/repository/maven-public/")
     }
