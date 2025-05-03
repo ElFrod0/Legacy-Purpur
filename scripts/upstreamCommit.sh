@@ -43,7 +43,7 @@ logsuffix=""
 # Paper updates
 if [ -n "$paperHash" ]; then
     newHash=$(git diff gradle.properties | awk '/^+paperCommit =/{print $NF}')
-    paper=$(getCommits "PaperMC/Paper" "$paperHash" $(echo $newHash | grep . -q && echo $newHash || echo "HEAD"))
+    paper=$(getCommits "PaperMC/Paper-archive" "$paperHash" $(echo $newHash | grep . -q && echo $newHash || echo "HEAD"))
 
     # Updates found
     if [ -n "$paper" ]; then
