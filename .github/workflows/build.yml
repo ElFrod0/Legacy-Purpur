@@ -5,7 +5,7 @@ on:
       minecraft_version:
         description: 'Minecraft version (defaults to 1.21.4)'
         required: false
-        default: '1.21.4'
+        default: '1.21.1'
       release_version:
         description: 'Release version (defaults to R0.1)'
         required: false
@@ -38,7 +38,7 @@ jobs:
       - name: Configure Git
         run: git config --global user.email "no-reply@github.com" && git config --global user.name "GitHub Actions"
       - name: Apply Patches
-        run: ./gradlew applyAllPatches --no-daemon --stacktrace
+        run: ./gradlew applyPatches --no-daemon --stacktrace
       - name: Build and Test
         if: ${{ github.event.inputs.run_tests }}
         run: ./gradlew build --no-daemon --stacktrace
@@ -106,5 +106,5 @@ jobs:
         if: ${{ failure() }}
         run: |
           ./gradlew clean cleanCache --refresh-dependencies
-          ./gradlew applyAllPatches --no-daemon --stacktrace 
+          ./gradlew applyPatches --no-daemon --stacktrace 
           ./gradlew build --no-daemon --stacktrace
