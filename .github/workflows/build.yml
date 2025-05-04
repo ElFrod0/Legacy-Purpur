@@ -42,7 +42,7 @@ jobs:
       - name: Apply Patches
         run: ./gradlew applyPatches --no-daemon --stacktrace
       - name: Build and Test
-        if: ${{ github.event.inputs.run_tests }}
+        if: ${{ github.event.inputs.run_tests == 'true' }}
         run: ./gradlew build --no-daemon --stacktrace
       #
       # Steps below only happen if build number is present.
@@ -52,29 +52,29 @@ jobs:
         run: |
           BUILD_NUMBER="${{ github.event.inputs.build_number }}"
           ./gradlew createMojmapPaperclipJar --no-daemon --stacktrace
-      - name: Generate Changelog
-        if: ${{ github.event.inputs.build_number != '' }}
-        run: |
-          git fetch --tags
-          export PREV_TAG=$(git tag --list 'MC*-b*' | sort -V | tail -n 1 || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            echo "No previous tag found, using all commits."
-            git log --pretty=format:"- %s (%an)" > changelog.txt
-          else
-            echo "Generating changelog from $PREV_TAG"
-            git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" > changelog.txt
-          fi
-          echo "Changelog generated:"
-          cat changelog.txt
-          
-          {
-            echo "<details>"
-            echo "<summary>📜 Changelog</summary>"
-            echo ""
-            cat changelog.txt
-            echo ""
-            echo "</details>"
-          } > formatted_changelog.txt
+      #- name: Generate Changelog
+      #  if: ${{ github.event.inputs.build_number != '' }}
+      #  run: |
+      #    git fetch --tags
+      #    export PREV_TAG=$(git tag --list 'MC*-b*' | sort -V | tail -n 1 || echo "")
+      #    if [ -z "$PREV_TAG" ]; then
+      #      echo "No previous tag found, using all commits."
+      #      git log --pretty=format:"- %s (%an)" > changelog.txt
+      #    else
+      #      echo "Generating changelog from $PREV_TAG"
+      #      git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" > changelog.txt
+      #    fi
+      #    echo "Changelog generated:"
+      #    cat changelog.txt
+      #
+      #    {
+      #      echo "<details>"
+      #      echo "<summary>📜 Changelog</summary>"
+      #      echo ""
+      #      cat changelog.txt
+      #      echo ""
+      #      echo "</details>"
+      #    } > formatted_changelog.txt
       - name: Rename Artifact File
         if: ${{ github.event.inputs.build_number != '' }}
         run: |
@@ -98,7 +98,7 @@ jobs:
           name: Legacy-Purpur MC${{ github.event.inputs.minecraft_version }} b${{ github.event.inputs.build_number }}
           draft: false
           prerelease: false
-          body_path: formatted_changelog.txt
+          #body_path: formatted_changelog.txt
           files: |
             ./build/libs/purpur-paperclip-${{ github.event.inputs.minecraft_version }}-${{ github.event.inputs.release_version }}-${{ github.event.inputs.build_number }}-mojmap.jar
       #
