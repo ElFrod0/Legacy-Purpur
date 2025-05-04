@@ -1,33 +1,110 @@
 name: Build
 on:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - "ver/**"
-
+    inputs:
+      minecraft_version:
+        description: 'Minecraft version (defaults to 1.21.4)'
+        required: false
+        default: '1.21.4'
+      release_version:
+        description: 'Release version (defaults to R0.1)'
+        required: false
+        default: 'R0.1'
+      build_number:
+        description: 'Configured build number releases to production.'
+        required: false
+        default: ''
+      run_tests:
+        description: 'Run tests? (Part of build)'
+        required: true
+        default: true
+        type: boolean
 jobs:
   build:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
-    if: "!contains(github.event.commits[0].message, '[ci-skip]')"
+    #if: "!contains(github.event.commits[0].message, '[skip]')"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Load full commit history
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: 'gradle'
-      - uses: gradle/wrapper-validation-action@v2
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4
       - name: Configure Git
-        run: git config --global user.email "no-reply@github.com" && git config --global user.name "Github Actions"
+        run: git config --global user.email "no-reply@github.com" && git config --global user.name "GitHub Actions"
       - name: Apply Patches
-        run: ./gradlew applyPatches --no-daemon --stacktrace
-      - name: Build
+        run: ./gradlew applyAllPatches --no-daemon --stacktrace
+      - name: Build and Test
+        if: ${{ github.event.inputs.run_tests }}
         run: ./gradlew build --no-daemon --stacktrace
+      #
+      # Steps below only happen if build number is present.
+      #
+      - name: Generate MojmapPaperclipJar
+        if: ${{ github.event.inputs.build_number != '' }}
+        run: |
+          BUILD_NUMBER="${{ github.event.inputs.build_number }}"
+          ./gradlew createMojmapPaperclipJar --no-daemon --stacktrace
+      - name: Generate Changelog
+        if: ${{ github.event.inputs.build_number != '' }}
+        run: |
+          git fetch --tags
+          export PREV_TAG=$(git tag --list 'MC*-b*' | sort -V | tail -n 1 || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, using all commits."
+            git log --pretty=format:"- %s (%an)" > changelog.txt
+          else
+            echo "Generating changelog from $PREV_TAG"
+            git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" > changelog.txt
+          fi
+          echo "Changelog generated:"
+          cat changelog.txt
+          
+          {
+            echo "<details>"
+            echo "<summary>📜 Changelog</summary>"
+            echo ""
+            cat changelog.txt
+            echo ""
+            echo "</details>"
+          } > formatted_changelog.txt
+      - name: Rename Artifact File
+        if: ${{ github.event.inputs.build_number != '' }}
+        run: |
+          export ARTIFACT_NAME="purpur-paperclip-${{ github.event.inputs.minecraft_version }}-${{ github.event.inputs.release_version }}-${{ github.event.inputs.build_number }}-mojmap.jar"
+          echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
+          export GENERATED_ARTIFACT=$(ls ./build/libs | grep 'paperclip' | sort | tail -n 1)
+          if [ -f "./build/libs/$GENERATED_ARTIFACT" ]; then
+            echo "Generated artifact is: $GENERATED_ARTIFACT"
+            mv ./build/libs/$GENERATED_ARTIFACT ./build/libs/$ARTIFACT_NAME
+            echo "Renamed artifact to: $ARTIFACT_NAME"
+          else
+            echo "Error: Artifact not found!"
+            exit 1
+          fi
+      - name: Create Release
+        if: ${{ github.event.inputs.build_number != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: MC${{ github.event.inputs.minecraft_version }}-b${{ github.event.inputs.build_number }}
+          name: Legacy-Purpur MC${{ github.event.inputs.minecraft_version }} b${{ github.event.inputs.build_number }}
+          draft: false
+          prerelease: false
+          body_path: formatted_changelog.txt
+          files: |
+            ./build/libs/purpur-paperclip-${{ github.event.inputs.minecraft_version }}-${{ github.event.inputs.release_version }}-${{ github.event.inputs.build_number }}-mojmap.jar
+      #
+      # Except the rebuild on failure below.
+      #
       - name: Rebuild on Failure
         if: ${{ failure() }}
         run: |
-          ./gradlew clean cleanCache
-          ./gradlew applyPatches --no-daemon --stacktrace 
+          ./gradlew clean cleanCache --refresh-dependencies
+          ./gradlew applyAllPatches --no-daemon --stacktrace 
           ./gradlew build --no-daemon --stacktrace
